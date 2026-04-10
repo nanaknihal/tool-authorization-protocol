@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register Approver</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0a0a0a; color: #e5e5e5; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 16px;
+    max-width: 480px; width: 100%; padding: 32px; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  p { color: #888; font-size: 14px; margin-bottom: 24px; }
+  .field { margin-bottom: 16px; }
+  label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.05em;
+    display: block; margin-bottom: 6px; }
+  input { width: 100%; padding: 12px; background: #1a1a1a; border: 1px solid #2a2a2a;
+    border-radius: 8px; color: #e5e5e5; font-size: 15px; outline: none; }
+  input:focus { border-color: #22c55e; }
+  .btn { width: 100%; padding: 14px; background: #22c55e; color: #000; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
+    margin-top: 8px; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .status { text-align: center; margin-top: 16px; font-size: 14px; color: #888; }
+  .status.success { color: #22c55e; }
+  .status.error { color: #ef4444; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Register as Approver</h1>
+  <p>Register your device (Face ID, fingerprint, or YubiKey) to approve agent actions securely.</p>
+  <div class="field">
+    <label>Your Name</label>
+    <input type="text" id="approver-name" placeholder="e.g. alice" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>Display Name</label>
+    <input type="text" id="display-name" placeholder="e.g. Alice Smith">
+  </div>
+  <button class="btn" id="register-btn" onclick="register()">Register Device</button>
+  <div class="status" id="status"></div>
+</div>
+<script>
+const API = window.location.origin;
+
+async function register() {
+  const approverName = document.getElementById('approver-name').value.trim();
+  const displayName = document.getElementById('display-name').value.trim();
+  const btn = document.getElementById('register-btn');
+  const status = document.getElementById('status');
+
+  if (!approverName || !displayName) {
+    status.textContent = 'Please fill in both fields.';
+    status.className = 'status error';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Starting registration...';
+  status.className = 'status';
+
+  try {
+    // Step 1: Get creation options from server
+    const beginRes = await fetch(`${API}/approve/register/begin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approver_name: approverName, display_name: displayName })
+    });
+    if (!beginRes.ok) throw new Error(await beginRes.text());
+    const options = await beginRes.json();
+
+    // Step 2: Create credential (browser prompts for biometric / YubiKey)
+    status.textContent = 'Touch your security key or use biometric...';
+    const credential = await navigator.credentials.create({ publicKey: options.publicKey });
+
+    // Step 3: Send attestation to server
+    const finishRes = await fetch(`${API}/approve/register/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approver_name: approverName,
+        credential: {
+          id: credential.id,
+          rawId: bufToBase64url(credential.rawId),
+          type: credential.type,
+          response: {
+            attestationObject: bufToBase64url(credential.response.attestationObject),
+            clientDataJSON: bufToBase64url(credential.response.clientDataJSON)
+          }
+        }
+      })
+    });
+    if (!finishRes.ok) throw new Error(await finishRes.text());
+
+    status.textContent = 'Registered! You can now approve agent actions.';
+    status.className = 'status success';
+    btn.textContent = 'Registered';
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      status.textContent = 'Registration cancelled. Try again.';
+      btn.disabled = false;
+    } else {
+      status.textContent = `Error: ${e.message}`;
+      status.className = 'status error';
+      btn.disabled = false;
+    }
+  }
+}
+
+function bufToBase64url(buf) {
+  const bytes = new Uint8Array(buf);
+  let str = '';
+  bytes.forEach(b => str += String.fromCharCode(b));
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "@nnsk/tap",
+  "version": "0.1.5",
+  "description": "Set up Tool Authorization Protocol (TAP) for your AI agent in one command",
+  "bin": {
+    "toolauthz": "./bin/setup.mjs"
+  },
+  "scripts": {
+    "test": "node test/setup.test.mjs"
+  },
+  "files": [
+    "bin",
+    "commands"
+  ],
+  "keywords": [
+    "claude-code",
+    "tap",
+    "agentsec",
+    "credential-proxy",
+    "ai-agent"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nanaknihal/agentsec.git",
+    "directory": "packages/toolauthz"
+  }
+}

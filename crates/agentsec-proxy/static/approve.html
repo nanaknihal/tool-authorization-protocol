@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approve Request</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: #0a0a0a; color: #e5e5e5; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #141414; border: 1px solid #2a2a2a; border-radius: 16px;
+    max-width: 480px; width: 100%; padding: 32px; }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .shield { width: 32px; height: 32px; fill: #22c55e; }
+  h1 { font-size: 20px; font-weight: 600; }
+  .detail { margin-bottom: 16px; }
+  .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 4px; }
+  .value { font-size: 15px; word-break: break-all; }
+  .value.mono { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px;
+    background: #1a1a1a; padding: 8px 12px; border-radius: 8px; border: 1px solid #2a2a2a; }
+  .body-preview { max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+  .actions { display: flex; gap: 12px; margin-top: 24px; }
+  .btn { flex: 1; padding: 14px; border: none; border-radius: 12px; font-size: 16px;
+    font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-approve { background: #22c55e; color: #000; }
+  .btn-deny { background: #333; color: #e5e5e5; }
+  .btn-register { background: #3b82f6; color: #fff; }
+  .btn-link { background: none; border: none; color: #3b82f6; font-size: 13px;
+    cursor: pointer; padding: 0; margin-top: 12px; text-align: center; display: block;
+    width: 100%; }
+  .btn-link:hover { text-decoration: underline; }
+  .status { text-align: center; margin-top: 16px; font-size: 14px; color: #888; }
+  .status.success { color: #22c55e; }
+  .status.error { color: #ef4444; }
+  .status.denied { color: #f59e0b; }
+  .loading { display: none; text-align: center; padding: 40px; }
+  .loading.active { display: block; }
+  .spinner { width: 24px; height: 24px; border: 3px solid #333; border-top-color: #22c55e;
+    border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Registration form */
+  .register-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #2a2a2a; }
+  .register-section h2 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .register-section p { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .field { margin-bottom: 12px; }
+  .field label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.05em;
+    display: block; margin-bottom: 6px; }
+  .field input { width: 100%; padding: 10px 12px; background: #1a1a1a; border: 1px solid #2a2a2a;
+    border-radius: 8px; color: #e5e5e5; font-size: 14px; outline: none; }
+  .field input:focus { border-color: #22c55e; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="loading active" id="loading">
+    <div class="spinner"></div>
+    <p style="margin-top: 12px; color: #888;">Loading request details...</p>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="header">
+      <svg class="shield" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>
+      <h1>Approval Request</h1>
+    </div>
+    <div class="detail">
+      <div class="label">Agent</div>
+      <div class="value" id="agent"></div>
+    </div>
+    <div class="detail">
+      <div class="label">Service</div>
+      <div class="value" id="credential"></div>
+    </div>
+    <div class="detail">
+      <div class="label">Action</div>
+      <div class="value mono" id="action"></div>
+    </div>
+    <div class="detail" id="body-section" style="display:none">
+      <div class="label">Body</div>
+      <div class="value mono body-preview" id="body"></div>
+    </div>
+
+    <!-- Auth mode: user has passkeys -->
+    <div id="auth-section">
+      <div class="actions">
+        <button class="btn btn-approve" id="approve-btn" onclick="approve()">Approve</button>
+        <button class="btn btn-deny" id="deny-btn" onclick="deny()">Deny</button>
+      </div>
+      <button class="btn-link" id="register-link" onclick="showRegisterForm()">Register a new device</button>
+    </div>
+
+    <!-- Register mode: no passkeys yet -->
+    <div id="register-section" class="register-section hidden">
+      <h2>Register Your Passkey</h2>
+      <p>No passkey found for this device. Register one to approve requests with Face ID, fingerprint, or YubiKey.</p>
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="approver-name" placeholder="e.g. alice" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Display Name</label>
+        <input type="text" id="display-name" placeholder="e.g. Alice Smith">
+      </div>
+      <div class="actions">
+        <button class="btn btn-register" id="register-btn" onclick="registerAndApprove()">Register & Approve</button>
+        <button class="btn btn-deny" id="deny-btn-reg" onclick="deny()">Deny</button>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+</div>
+<script>
+const pathParts = window.location.pathname.split('/');
+const txnId = pathParts[pathParts.length - 1];
+const API = window.location.origin;
+
+async function load() {
+  try {
+    const res = await fetch(`${API}/approve/txn/${txnId}/details`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    document.getElementById('agent').textContent = data.agent_id;
+    document.getElementById('credential').textContent = data.credential_name;
+    document.getElementById('action').textContent = `${data.method} ${data.target_url}`;
+    if (data.body_preview) {
+      document.getElementById('body').textContent = data.body_preview;
+      document.getElementById('body-section').style.display = '';
+    }
+    document.getElementById('loading').classList.remove('active');
+    document.getElementById('content').style.display = '';
+
+    if (data.has_passkeys) {
+      // Passkeys exist — show auth mode (approve/deny buttons)
+      showAuthMode();
+    } else {
+      // No passkeys — show registration form
+      showRegisterMode();
+    }
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<p style="color:#ef4444">Failed to load: ${e.message}</p>`;
+  }
+}
+
+function showAuthMode() {
+  document.getElementById('auth-section').classList.remove('hidden');
+  document.getElementById('register-section').classList.add('hidden');
+}
+
+function showRegisterMode() {
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('register-section').classList.remove('hidden');
+}
+
+function showRegisterForm() {
+  // Transition from auth mode to register mode (user clicked "Register a new device")
+  showRegisterMode();
+}
+
+async function approve() {
+  const btn = document.getElementById('approve-btn');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  status.textContent = 'Starting biometric verification...';
+  status.className = 'status';
+
+  try {
+    // Step 1: Get WebAuthn challenge
+    const beginRes = await fetch(`${API}/approve/txn/${txnId}/begin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (!beginRes.ok) {
+      const err = await beginRes.json().catch(() => ({}));
+      if (err.error === 'no_credentials') {
+        // No passkeys registered — switch to register mode
+        showRegisterMode();
+        status.textContent = '';
+        btn.disabled = false;
+        return;
+      }
+      throw new Error(err.message || err.error || `HTTP ${beginRes.status}`);
+    }
+    const options = await beginRes.json();
+
+    // Step 2: WebAuthn authentication (biometric / YubiKey)
+    status.textContent = 'Touch your security key or use biometric...';
+    const credential = await navigator.credentials.get({ publicKey: options.publicKey });
+
+    // Step 3: Send assertion to server
+    const finishRes = await fetch(`${API}/approve/txn/${txnId}/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: credential.id,
+        rawId: bufToBase64url(credential.rawId),
+        type: credential.type,
+        response: {
+          authenticatorData: bufToBase64url(credential.response.authenticatorData),
+          clientDataJSON: bufToBase64url(credential.response.clientDataJSON),
+          signature: bufToBase64url(credential.response.signature),
+          userHandle: credential.response.userHandle
+            ? bufToBase64url(credential.response.userHandle) : null
+        }
+      })
+    });
+    if (!finishRes.ok) throw new Error(await finishRes.text());
+
+    const result = await finishRes.json();
+    status.textContent = result.approver ? `Approved by ${result.approver}` : 'Approved';
+    status.className = 'status success';
+    btn.textContent = 'Approved';
+    document.getElementById('deny-btn').disabled = true;
+    document.getElementById('register-link').classList.add('hidden');
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      status.textContent = 'Cancelled. Try again or register a new device.';
+      btn.disabled = false;
+    } else {
+      status.textContent = `Error: ${e.message}`;
+      status.className = 'status error';
+      btn.disabled = false;
+    }
+  }
+}
+
+async function registerAndApprove() {
+  const approverName = document.getElementById('approver-name').value.trim();
+  const displayName = document.getElementById('display-name').value.trim();
+  const btn = document.getElementById('register-btn');
+  const status = document.getElementById('status');
+
+  if (!approverName || !displayName) {
+    status.textContent = 'Please fill in both name fields.';
+    status.className = 'status error';
+    return;
+  }
+
+  btn.disabled = true;
+  status.textContent = 'Starting passkey registration...';
+  status.className = 'status';
+
+  try {
+    // Step 1: Begin registration
+    const beginRes = await fetch(`${API}/approve/txn/${txnId}/register/begin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approver_name: approverName, display_name: displayName })
+    });
+    if (!beginRes.ok) throw new Error(await beginRes.text());
+    const options = await beginRes.json();
+
+    // Step 2: Create credential (browser prompts for biometric)
+    status.textContent = 'Touch your security key or use biometric to register...';
+    const credential = await navigator.credentials.create({ publicKey: options.publicKey });
+
+    // Step 3: Finish registration
+    const finishRes = await fetch(`${API}/approve/txn/${txnId}/register/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approver_name: approverName,
+        credential: {
+          id: credential.id,
+          rawId: bufToBase64url(credential.rawId),
+          type: credential.type,
+          response: {
+            attestationObject: bufToBase64url(credential.response.attestationObject),
+            clientDataJSON: bufToBase64url(credential.response.clientDataJSON)
+          }
+        }
+      })
+    });
+    if (!finishRes.ok) throw new Error(await finishRes.text());
+
+    status.textContent = 'Passkey registered! Approving...';
+    status.className = 'status success';
+
+    // Switch to auth mode and auto-approve
+    showAuthMode();
+    await approve();
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      status.textContent = 'Registration cancelled. Try again.';
+      btn.disabled = false;
+    } else {
+      status.textContent = `Error: ${e.message}`;
+      status.className = 'status error';
+      btn.disabled = false;
+    }
+  }
+}
+
+async function deny() {
+  const btns = [document.getElementById('deny-btn'), document.getElementById('deny-btn-reg')];
+  btns.forEach(b => { if (b) b.disabled = true; });
+  try {
+    await fetch(`${API}/approve/txn/${txnId}/deny`, { method: 'POST' });
+    document.getElementById('status').textContent = 'Denied';
+    document.getElementById('status').className = 'status denied';
+    const approveBtn = document.getElementById('approve-btn');
+    if (approveBtn) approveBtn.disabled = true;
+    const regBtn = document.getElementById('register-btn');
+    if (regBtn) regBtn.disabled = true;
+  } catch (e) {
+    document.getElementById('status').textContent = `Error: ${e.message}`;
+    btns.forEach(b => { if (b) b.disabled = false; });
+  }
+}
+
+function bufToBase64url(buf) {
+  const bytes = new Uint8Array(buf);
+  let str = '';
+  bytes.forEach(b => str += String.fromCharCode(b));
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+load();
+</script>
+</body>
+</html>
