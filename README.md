@@ -10,6 +10,14 @@ This repository contains the code that is most useful for:
 - improving connector-side request shaping
 - contributing fixes to the core TAP experience
 
+## Start Here
+
+- `docs/request-cookbook.md` — exact request shapes for direct credentials, full-URL sidecars, and relative-path sidecars
+- `docs/connector-matrix.md` — compact connector behavior table with code pointers
+- `packages/toolauthz` — local setup and skill-install workflows
+- `crates/agentsec-proxy/src/routing.rs` — how TAP resolves connector target shapes
+- `scripts/telegram_sidecar.py` — an example of a custom sidecar-backed connector
+
 ## Included
 
 - core proxy and storage crates
@@ -26,7 +34,7 @@ This repository contains the code that is most useful for:
 - production workflows and secret bootstrapping
 - managed hosting operations glue
 
-Those pieces stay private so the hosted product remains the easiest safe path to production.
+Hosted deployment and operational infrastructure are maintained separately from this repository.
 
 ## Contributing
 
